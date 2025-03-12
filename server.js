@@ -75,6 +75,9 @@ app.get('/auth/callback', async (req, res) => {
     responseText += `Scope: ${scope}\n`;
     responseText += `Expires In: ${tokenResponse.data.expires_in} seconds\n`;
     
+    // Log the token details for debugging
+    console.log(responseText);
+    
     // Only try to get user info if we have the right scope
     if (scope && scope.includes('user.info.basic')) {
       try {
@@ -92,28 +95,25 @@ app.get('/auth/callback', async (req, res) => {
         
         console.log('User info:', userResponse.data);
         
-        // Add user info to response if available
+        // Log user info for debugging
         if (userResponse.data && userResponse.data.data) {
           const userData = userResponse.data.data;
-          responseText += `\nUser Info:\n`;
-          responseText += `Display Name: ${userData.display_name || 'N/A'}\n`;
-          responseText += `Avatar URL: ${userData.avatar_url || 'N/A'}\n`;
+          console.log(`User Info: Display Name: ${userData.display_name || 'N/A'}, Avatar URL: ${userData.avatar_url || 'N/A'}`);
         }
       } catch (userInfoError) {
         console.error('Error getting user info:', userInfoError.response ? userInfoError.response.data : userInfoError.message);
-        responseText += `\nNote: Could not retrieve user info. Error: ${userInfoError.message}\n`;
       }
     } else {
-      responseText += `\nNote: User info not requested due to missing scope. Available scope: ${scope}\n`;
+      console.log(`Note: User info not requested due to missing scope. Available scope: ${scope}`);
     }
     
-    // Send the response with all available information
-    res.send(responseText);
+    // Redirect to the integration page instead of displaying token info
+    res.redirect('https://agentcontent.info/integration.html');
     
   } catch (error) {
     console.error('Error exchanging code for token:', error.response ? error.response.data : error.message);
     
-    // More detailed error information
+    // More detailed error information for logs
     let errorMessage = `Access Token: undefined\nError: ${error.message}`;
     
     if (error.response) {
@@ -136,7 +136,11 @@ app.get('/auth/callback', async (req, res) => {
       });
     }
     
-    res.send(errorMessage);
+    // Log the error message
+    console.error(errorMessage);
+    
+    // Redirect to the integration page with an error parameter
+    res.redirect('https://agentcontent.info/integration.html?error=auth_failed');
   }
 });
 
