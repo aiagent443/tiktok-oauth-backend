@@ -37,18 +37,25 @@ app.get('/auth/callback', async (req, res) => {
   
   try {
     // Exchange the authorization code for an access token
+    console.log('Attempting to exchange code for token with the following parameters:');
+    console.log('- client_key:', TIKTOK_CLIENT_KEY);
+    console.log('- client_secret:', TIKTOK_CLIENT_SECRET ? '[SECRET PRESENT]' : '[SECRET MISSING]');
+    console.log('- code:', code ? '[CODE PRESENT]' : '[CODE MISSING]');
+    console.log('- redirect_uri:', 'https://tiktok-oauth-backend.onrender.com/auth/callback');
+    
     const tokenResponse = await axios({
       method: 'post',
       url: 'https://open.tiktokapis.com/v2/oauth/token/',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Cache-Control': 'no-cache'
       },
       data: new URLSearchParams({
         client_key: TIKTOK_CLIENT_KEY,
         client_secret: TIKTOK_CLIENT_SECRET,
         code: code,
         grant_type: 'authorization_code',
-        redirect_uri: `https://tiktok-oauth-backend.onrender.com/auth/callback`
+        redirect_uri: 'https://tiktok-oauth-backend.onrender.com/auth/callback'
       }).toString()
     });
     
