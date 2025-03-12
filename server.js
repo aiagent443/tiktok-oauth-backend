@@ -81,7 +81,31 @@ app.get('/auth/callback', async (req, res) => {
     
   } catch (error) {
     console.error('Error exchanging code for token:', error.response ? error.response.data : error.message);
-    res.send(`Access Token: undefined\nError: ${error.message}`);
+    
+    // More detailed error information
+    let errorMessage = `Access Token: undefined\nError: ${error.message}`;
+    
+    if (error.response) {
+      errorMessage += `\nStatus: ${error.response.status}`;
+      errorMessage += `\nData: ${JSON.stringify(error.response.data, null, 2)}`;
+      
+      // Log the request that caused the error
+      console.error('Request that caused error:', {
+        url: 'https://open.tiktokapis.com/v2/oauth/token/',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        data: {
+          client_key: TIKTOK_CLIENT_KEY,
+          // Don't log the actual secret, just indicate if it's present
+          client_secret: TIKTOK_CLIENT_SECRET ? '[SECRET PRESENT]' : '[SECRET MISSING]',
+          code: code ? '[CODE PRESENT]' : '[CODE MISSING]',
+          grant_type: 'authorization_code',
+          redirect_uri: 'https://tiktok-oauth-backend.onrender.com/auth/callback'
+        }
+      });
+    }
+    
+    res.send(errorMessage);
   }
 });
 
