@@ -62,29 +62,53 @@ app.get('/auth/callback', async (req, res) => {
     console.log('Token response:', tokenResponse.data);
     
     const accessToken = tokenResponse.data.access_token;
+    const scope = tokenResponse.data.scope;
     
     if (!accessToken) {
       console.error('Failed to get access token:', tokenResponse.data);
       return res.send(`Access Token: undefined`);
     }
     
-    // Get user info using the access token
-    const userResponse = await axios({
-      method: 'get',
-      url: 'https://open.tiktokapis.com/v2/user/info/',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      },
-      params: {
-        fields: 'open_id,union_id,avatar_url,avatar_url_100,avatar_url_200,display_name,bio_description,profile_deep_link'
+    // Success response with token details
+    let responseText = `Access Token: ${accessToken}\n`;
+    responseText += `Open ID: ${tokenResponse.data.open_id}\n`;
+    responseText += `Scope: ${scope}\n`;
+    responseText += `Expires In: ${tokenResponse.data.expires_in} seconds\n`;
+    
+    // Only try to get user info if we have the right scope
+    if (scope && scope.includes('user.info.basic')) {
+      try {
+        // Get user info using the access token
+        const userResponse = await axios({
+          method: 'get',
+          url: 'https://open.tiktokapis.com/v2/user/info/',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          },
+          params: {
+            fields: 'open_id,display_name,avatar_url'  // Reduced field set
+          }
+        });
+        
+        console.log('User info:', userResponse.data);
+        
+        // Add user info to response if available
+        if (userResponse.data && userResponse.data.data) {
+          const userData = userResponse.data.data;
+          responseText += `\nUser Info:\n`;
+          responseText += `Display Name: ${userData.display_name || 'N/A'}\n`;
+          responseText += `Avatar URL: ${userData.avatar_url || 'N/A'}\n`;
+        }
+      } catch (userInfoError) {
+        console.error('Error getting user info:', userInfoError.response ? userInfoError.response.data : userInfoError.message);
+        responseText += `\nNote: Could not retrieve user info. Error: ${userInfoError.message}\n`;
       }
-    });
+    } else {
+      responseText += `\nNote: User info not requested due to missing scope. Available scope: ${scope}\n`;
+    }
     
-    console.log('User info:', userResponse.data);
-    
-    // Redirect back to the frontend with the access token
-    // In a production environment, you would store the token securely and use sessions
-    res.send(`Access Token: ${accessToken}`);
+    // Send the response with all available information
+    res.send(responseText);
     
   } catch (error) {
     console.error('Error exchanging code for token:', error.response ? error.response.data : error.message);
