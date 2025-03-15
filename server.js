@@ -65,21 +65,44 @@ app.get('/auth/callback', async (req, res) => {
     
     console.log('Token response:', tokenResponse.data);
     
-    // Extract token data
-    const { access_token, refresh_token, open_id, expires_in, scope } = tokenResponse.data;
+    // Extract token data - TikTok API v2 nests the token data inside a 'data' object
+    let access_token, refresh_token, open_id, expires_in, scope;
+    
+    // Check if the response has the expected structure
+    if (tokenResponse.data && tokenResponse.data.data) {
+      // V2 API structure
+      ({ access_token, refresh_token, open_id, expires_in, scope } = tokenResponse.data.data);
+      console.log('Using V2 API response structure');
+    } else if (tokenResponse.data) {
+      // Direct structure (fallback)
+      ({ access_token, refresh_token, open_id, expires_in, scope } = tokenResponse.data);
+      console.log('Using direct response structure');
+    } else {
+      console.error('Unexpected token response structure:', tokenResponse);
+      return res.redirect(`${FRONTEND_URL}/integration.html?auth=error&message=${encodeURIComponent('Unexpected token response structure')}`);
+    }
+    
+    console.log('Extracted token data:', { 
+      access_token: access_token ? 'PRESENT' : 'MISSING', 
+      open_id: open_id || 'MISSING',
+      scope: scope || 'MISSING',
+      expires_in: expires_in || 'MISSING'
+    });
     
     if (!access_token) {
       console.error('Failed to get access token:', tokenResponse.data);
-      return res.redirect(`${FRONTEND_URL}?auth=error&message=${encodeURIComponent('Failed to get access token')}`);
+      return res.redirect(`${FRONTEND_URL}/integration.html?auth=error&message=${encodeURIComponent('Failed to get access token')}`);
     }
     
     // Store tokens (in a real app, save to database)
     tokenStore[open_id] = {
       access_token,
       refresh_token,
-      expires_at: Date.now() + (expires_in * 1000),
+      expires_at: Date.now() + ((expires_in || 86400) * 1000),
       scope
     };
+    
+    console.log(`Token stored for user ${open_id}. Token store now has ${Object.keys(tokenStore).length} entries.`);
     
     // Success response with token details
     let responseText = `Access Token: ${access_token}\n`;
@@ -160,7 +183,11 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/api/token-status/:open_id', (req, res) => {
   const { open_id } = req.params;
   
+  console.log(`Token status check for open_id: ${open_id}`);
+  console.log(`Current token store has ${Object.keys(tokenStore).length} entries: ${Object.keys(tokenStore).join(', ')}`);
+  
   if (!open_id || !tokenStore[open_id]) {
+    console.log(`No token found for open_id: ${open_id}`);
     return res.status(404).json({
       success: false,
       authenticated: false,
@@ -171,11 +198,35 @@ app.get('/api/token-status/:open_id', (req, res) => {
   const tokenData = tokenStore[open_id];
   const isValid = tokenData.expires_at > Date.now();
   
+  console.log(`Token for ${open_id} is ${isValid ? 'valid' : 'expired'}, expires in ${Math.floor((tokenData.expires_at - Date.now()) / 1000)} seconds`);
+  
   return res.json({
     success: true,
     authenticated: isValid,
     expires_at: tokenData.expires_at,
-    expires_in: Math.floor((tokenData.expires_at - Date.now()) / 1000)
+    expires_in: Math.floor((tokenData.expires_at - Date.now()) / 1000),
+    scopes: tokenData.scope
+  });
+});
+
+// Debug endpoint to check token store (only for development)
+app.get('/api/debug/tokens', (req, res) => {
+  // Create a safe version of the token store that doesn't expose actual tokens
+  const safeTokenStore = {};
+  for (const [openId, data] of Object.entries(tokenStore)) {
+    safeTokenStore[openId] = {
+      has_access_token: !!data.access_token,
+      has_refresh_token: !!data.refresh_token,
+      expires_at: data.expires_at,
+      expires_in: Math.floor((data.expires_at - Date.now()) / 1000),
+      is_valid: data.expires_at > Date.now(),
+      scope: data.scope
+    };
+  }
+  
+  res.json({
+    token_count: Object.keys(tokenStore).length,
+    tokens: safeTokenStore
   });
 });
 
@@ -183,7 +234,16 @@ app.get('/api/token-status/:open_id', (req, res) => {
 app.post('/api/post-to-tiktok', async (req, res) => {
   const { open_id, video_url, title, description, privacy_level } = req.body;
 
+  console.log('Received post-to-tiktok request:', {
+    open_id,
+    video_url,
+    title,
+    has_description: !!description,
+    privacy_level
+  });
+
   if (!open_id || !video_url) {
+    console.log('Missing required parameters');
     return res.status(400).json({ 
       success: false, 
       error: "Missing required parameters: open_id and video_url are required" 
@@ -193,6 +253,8 @@ app.post('/api/post-to-tiktok', async (req, res) => {
   // Check if we have a valid token for this user
   const tokenData = tokenStore[open_id];
   if (!tokenData || !tokenData.access_token) {
+    console.log(`No token found for open_id: ${open_id}`);
+    console.log(`Available tokens: ${Object.keys(tokenStore).join(', ')}`);
     return res.status(401).json({ 
       success: false, 
       error: "No valid access token found for this user. Please authenticate again." 
@@ -201,6 +263,7 @@ app.post('/api/post-to-tiktok', async (req, res) => {
 
   // Check if token is expired
   if (tokenData.expires_at <= Date.now()) {
+    console.log(`Token for ${open_id} is expired`);
     return res.status(401).json({ 
       success: false, 
       error: "Access token has expired. Please authenticate again." 
@@ -209,6 +272,7 @@ app.post('/api/post-to-tiktok', async (req, res) => {
 
   // Check if we have the video.publish scope
   if (!tokenData.scope || !tokenData.scope.includes('video.publish')) {
+    console.log(`Token for ${open_id} does not have video.publish scope. Available scopes: ${tokenData.scope}`);
     return res.status(403).json({ 
       success: false, 
       error: "The authenticated user does not have the video.publish scope. Please authenticate with the correct permissions." 
