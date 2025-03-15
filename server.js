@@ -119,8 +119,8 @@ app.get('/auth/callback', async (req, res) => {
       console.log(`Note: User info not requested due to missing scope. Available scope: ${scope}`);
     }
     
-    // Redirect to the frontend with success message and open_id
-    res.redirect(`${FRONTEND_URL}?auth=success&open_id=${open_id}`);
+    // Redirect to the integration.html page with success message and open_id
+    res.redirect(`${FRONTEND_URL}/integration.html?auth=success&open_id=${open_id}`);
     
   } catch (error) {
     console.error('Error exchanging code for token:', error.response ? error.response.data : error.message);
@@ -151,8 +151,8 @@ app.get('/auth/callback', async (req, res) => {
     // Log the error message
     console.error(errorMessage);
     
-    // Redirect to the frontend with an error parameter
-    res.redirect(`${FRONTEND_URL}?auth=error&message=${encodeURIComponent(error.message)}`);
+    // Redirect to the integration.html page with an error parameter
+    res.redirect(`${FRONTEND_URL}/integration.html?auth=error&message=${encodeURIComponent(error.message)}`);
   }
 });
 
