@@ -284,7 +284,7 @@ app.post('/api/post-to-tiktok', async (req, res) => {
     console.log('- open_id:', open_id);
     console.log('- video_url:', video_url);
     console.log('- title:', title);
-    console.log('- privacy_level:', privacy_level);
+    console.log('- privacy_level: SELF_ONLY (required for unaudited applications)');
 
     // Step 1: Initialize video upload
     const initResponse = await axios.post(
@@ -293,7 +293,7 @@ app.post('/api/post-to-tiktok', async (req, res) => {
         post_info: {
           title: title || "Historical Event Video",
           description: description || "Generated historical event video",
-          privacy_level: privacy_level || "SELF_ONLY", // Options: SELF_ONLY, FOLLOW_FRIENDS, PUBLIC
+          privacy_level: "SELF_ONLY", // Always use SELF_ONLY for unaudited applications
           disable_duet: false,
           disable_comment: false,
           disable_stitch: false,
@@ -341,7 +341,7 @@ app.post('/api/post-to-tiktok', async (req, res) => {
           post_info: {
             title: title || "Historical Event Video",
             description: description || "Generated historical event video",
-            privacy_level: privacy_level || "SELF_ONLY"
+            privacy_level: "SELF_ONLY" // Always use SELF_ONLY for unaudited applications
           },
           source_info: {
             source: "PULL_FROM_URL",
